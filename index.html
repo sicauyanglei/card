@@ -570,32 +570,41 @@ function startOver() {
             ctx.drawImage(img, 0, 0);
 
             const srcImg = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = srcImg.data;
+            const skinColor = detectSkinTone(srcImg.data, canvas.width, canvas.height);
+            const bgColor = hexToRgb(state.selectedBgColor);
 
-            // 检测皮肤色调范围 (简化版)
-            const skinColor = detectSkinTone(data, canvas.width, canvas.height);
+            // 分块处理像素，每块处理 10000 个像素，避免阻塞 UI
+            const chunkSize = 10000;
+            const totalPixels = srcImg.data.length / 4;
 
-            // 遍历每个像素，判断是否接近皮肤色
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i];
-              const g = data[i + 1];
-              const b = data[i + 2];
+            function processChunk(startPixel) {
+              const endPixel = Math.min(startPixel + chunkSize, totalPixels);
 
-              if (isSkinPixel(r, g, b, skinColor)) {
-                // 保留原像素（人像部分）
+              for (let i = startPixel; i < endPixel; i++) {
+                const idx = i * 4;
+                const r = srcImg.data[idx];
+                const g = srcImg.data[idx + 1];
+                const b = srcImg.data[idx + 2];
+
+                if (!isSkinPixel(r, g, b, skinColor)) {
+                  srcImg.data[idx] = bgColor.r;
+                  srcImg.data[idx + 1] = bgColor.g;
+                  srcImg.data[idx + 2] = bgColor.b;
+                }
+              }
+
+              if (endPixel < totalPixels) {
+                // 让浏览器喘口气，继续处理下一块
+                requestAnimationFrame(() => processChunk(endPixel));
               } else {
-                // 替换背景色
-                const bgColor = hexToRgb(state.selectedBgColor);
-                data[i] = bgColor.r;
-                data[i + 1] = bgColor.g;
-                data[i + 2] = bgColor.b;
-                // alpha 保持不变
+                ctx.putImageData(srcImg, 0, 0);
+                state.processedImage = canvas;
+                resolve();
               }
             }
 
-            ctx.putImageData(srcImg, 0, 0);
-            state.processedImage = canvas;
-            resolve();
+            // 开始分块处理
+            processChunk(0);
           } catch (err) {
             reject(err);
           }
