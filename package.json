@@ -1,0 +1,14 @@
+{
+  "name": "id-photo-maker",
+  "version": "1.0.0",
+  "description": "证件照制作工具 - 纯前端网页应用",
+  "scripts": {
+    "test": "playwright test",
+    "test:chromium": "playwright test --project=chromium",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}
