@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>证件照制作工具</title>
+  <style>
+    /* CSS 将后续步骤填充 */
+    /* 基础重置 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* 居中容器 */
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* 步骤指示器 */
+    .step-indicator {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    /* 卡片样式 */
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    /* 按钮样式 */
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .btn-primary {
+      background: #1E5AA8;
+      color: white;
+    }
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    /* 隐藏类 */
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>证件照制作工具</h1>
+    <div id="step-indicator">步骤指示器</div>
+    <div id="content"></div>
+  </div>
+
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+
+  <!-- JSZip -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <script>
+    // JS 将后续步骤填充
+
+    // 应用状态和步骤管理
+    const state = {
+      currentStep: 1,          // 1=拍照/选择, 2=检测中, 3=选背景色, 4=生成, 5=预览
+      originalImage: null,      // 原始图片（File 对象）
+      detectedFace: null,       // 检测到的人脸数据
+      processedImage: null,     // 处理后的人像（ImageData）
+      selectedBgColor: '#1E5AA8', // 默认蓝底
+      photos: {}                // 生成的各种尺寸证件照 { '1寸': canvas, '2寸': canvas, ... }
+    };
+
+    function setStep(step) {
+      state.currentStep = step;
+      render();
+    }
+
+    // 基础 render 函数框架
+    function render() {
+      const content = document.getElementById('content');
+      switch (state.currentStep) {
+        case 1: content.innerHTML = renderStep1(); break;
+        case 2: content.innerHTML = renderStep2(); break;
+        case 3: content.innerHTML = renderStep3(); break;
+        case 4: content.innerHTML = renderStep4(); break;
+        case 5: content.innerHTML = renderStep5(); break;
+      }
+    }
+
+    // 占位函数，后续步骤填充
+    function renderStep1() { return '<div>Step 1</div>'; }
+    function renderStep2() { return '<div>Step 2</div>'; }
+    function renderStep3() { return '<div>Step 3</div>'; }
+    function renderStep4() { return '<div>Step 4</div>'; }
+    function renderStep5() { return '<div>Step 5</div>'; }
+
+    // 启动
+    render();
+  </script>
+</body>
+</html>
