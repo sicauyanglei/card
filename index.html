@@ -280,8 +280,25 @@
       render();
     }
 
-    // 占位函数，后续步骤填充
-    function renderStep4() { return '<div>Step 4</div>'; }
+    // ==================== 证件照尺寸规格（单位px，300dpi）====================
+    const PHOTO_SIZES = {
+      '一寸': { mm: { width: 25, height: 35 }, px: { width: 295, height: 413 } },
+      '二寸': { mm: { width: 35, height: 49 }, px: { width: 413, height: 579 } },
+      '小二寸': { mm: { width: 33, height: 48 }, px: { width: 390, height: 567 } }
+    };
+
+    // ==================== 步骤 4: 生成中界面 ====================
+    function renderStep4() {
+      return `
+        <div class="card" style="text-align: center;">
+          <h2>第四步：生成证件照</h2>
+          <p>正在处理照片，请稍候...</p>
+          <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #f0f0f0; border-top: 4px solid #1E5AA8; border-radius: 50%; animation: spin 1s linear infinite; margin: 30px auto;"></div>
+          <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+        </div>
+      `;
+    }
+
     function renderStep5() { return '<div>Step 5</div>'; }
 
     // ==================== 人脸检测 ====================
@@ -337,9 +354,52 @@
       }
     }
 
-    // generatePhotos 将在 Task 5 中实现
-    function generatePhotos() {
-      console.log('generatePhotos will be implemented in Task 5');
+    // ==================== 生成各尺寸证件照 ====================
+    async function generatePhotos() {
+      setStep(4);
+      renderStep4();
+
+      // 处理图像（抠图+背景替换）
+      await processImage();
+
+      // 自动裁剪
+      await autoCrop();
+
+      const croppedCanvas = state.croppedImage;
+
+      // 生成各尺寸
+      state.photos = {};
+
+      for (const [name, size] of Object.entries(PHOTO_SIZES)) {
+        const photoCanvas = document.createElement('canvas');
+        const photoCtx = photoCanvas.getContext('2d');
+
+        photoCanvas.width = size.px.width;
+        photoCanvas.height = size.px.height;
+
+        // 绘制证件照（居中填充）
+        const srcAspect = croppedCanvas.width / croppedCanvas.height;
+        const dstAspect = size.px.width / size.px.height;
+
+        let sx = 0, sy = 0, sw = croppedCanvas.width, sh = croppedCanvas.height;
+        let dx = 0, dy = 0, dw = size.px.width, dh = size.px.height;
+
+        if (srcAspect > dstAspect) {
+          // 源更宽，按高度对齐，裁剪宽度
+          sw = croppedCanvas.height * dstAspect;
+          sx = (croppedCanvas.width - sw) / 2;
+        } else {
+          // 源更高，按宽度对齐，裁剪高度
+          sh = croppedCanvas.width / dstAspect;
+          sy = (croppedCanvas.height - sh) / 2;
+        }
+
+        photoCtx.drawImage(croppedCanvas, sx, sy, sw, sh, dx, dy, dw, dh);
+        state.photos[name] = photoCanvas;
+      }
+
+      setStep(5);
+      renderPhotoPreview();
     }
 
     // ==================== 图像处理：抠图 + 背景替换 ====================
