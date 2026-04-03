@@ -102,8 +102,142 @@
       }
     }
 
+    // ==================== 步骤 1: 拍照/选择 ====================
+    let cameraStream = null;
+
+    function renderStep1() {
+      return `
+        <div class="card">
+          <h2>第一步：上传照片</h2>
+          <p>请拍摄或选择一张正面照，确保面部清晰，光线均匀。</p>
+
+          <div class="upload-options" style="display: flex; gap: 20px; justify-content: center; margin: 30px 0;">
+            <button class="btn btn-primary" onclick="openCamera()">
+              📷 拍照
+            </button>
+            <button class="btn btn-secondary" onclick="selectFromGallery()">
+              📁 从相册选择
+            </button>
+          </div>
+
+          <input type="file" id="file-input" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+          <video id="camera-video" autoplay class="hidden" style="max-width: 100%;"></video>
+          <canvas id="camera-canvas" class="hidden"></canvas>
+          <button id="capture-btn" class="btn btn-primary hidden" onclick="capturePhoto()">📸 拍摄</button>
+
+          <div id="preview-area" class="hidden" style="text-align: center; margin-top: 20px;">
+            <img id="preview-img" style="max-width: 300px; border-radius: 8px;">
+            <div style="margin-top: 15px;">
+              <button class="btn btn-secondary" onclick="clearPhoto()">重新选择</button>
+              <button class="btn btn-primary" onclick="confirmPhoto()">确认使用</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function openCamera() {
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: 1280, height: 720 }
+        });
+        const video = document.getElementById('camera-video');
+        const previewArea = document.getElementById('preview-area');
+        const previewImg = document.getElementById('preview-img');
+        const captureBtn = document.getElementById('capture-btn');
+
+        video.classList.remove('hidden');
+        previewArea.classList.remove('hidden');
+        previewImg.classList.add('hidden');
+        captureBtn.classList.remove('hidden');
+
+        video.srcObject = cameraStream;
+      } catch (err) {
+        alert('无法打开相机，请检查权限设置。' + err.message);
+      }
+    }
+
+    function capturePhoto() {
+      const video = document.getElementById('camera-video');
+      const canvas = document.getElementById('camera-canvas');
+      const previewImg = document.getElementById('preview-img');
+      const captureBtn = document.getElementById('capture-btn');
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+
+      // 停止相机
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
+
+      // 显示预览
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      previewImg.src = dataUrl;
+      video.classList.add('hidden');
+      captureBtn.classList.add('hidden');
+      previewImg.classList.remove('hidden');
+
+      // 保存到 state
+      state.originalImage = dataURLtoFile(dataUrl, 'photo.jpg');
+    }
+
+    function selectFromGallery() {
+      document.getElementById('file-input').click();
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      state.originalImage = file;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const previewImg = document.getElementById('preview-img');
+        const previewArea = document.getElementById('preview-area');
+        const video = document.getElementById('camera-video');
+        const canvas = document.getElementById('camera-canvas');
+        const captureBtn = document.getElementById('capture-btn');
+
+        previewImg.src = e.target.result;
+        video.classList.add('hidden');
+        canvas.classList.add('hidden');
+        captureBtn.classList.add('hidden');
+        previewArea.classList.remove('hidden');
+        previewImg.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function dataURLtoFile(dataurl, filename) {
+      const arr = dataurl.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) u8arr[n] = bstr.charCodeAt(n);
+      return new File([u8arr], filename, { type: mime });
+    }
+
+    function clearPhoto() {
+      state.originalImage = null;
+      document.getElementById('file-input').value = '';
+      document.getElementById('preview-area').classList.add('hidden');
+    }
+
+    function confirmPhoto() {
+      if (!state.originalImage) {
+        alert('请先拍摄或选择照片');
+        return;
+      }
+      setStep(2);
+      detectFace();
+    }
+
     // 占位函数，后续步骤填充
-    function renderStep1() { return '<div>Step 1</div>'; }
     function renderStep2() { return '<div>Step 2</div>'; }
     function renderStep3() { return '<div>Step 3</div>'; }
     function renderStep4() { return '<div>Step 4</div>'; }
