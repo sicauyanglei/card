@@ -563,65 +563,56 @@ function startOver() {
         const img = new Image();
         img.onload = () => {
           try {
-            // 计算缩放比例，将图片最大边缩放到 1500px
-            const maxSize = 1500;
+            // 缩放到很小加快处理 (500px)
+            const maxSize = 500;
             let scale = 1;
             if (img.width > maxSize || img.height > maxSize) {
               scale = maxSize / Math.max(img.width, img.height);
             }
 
-            const scaledWidth = Math.round(img.width * scale);
-            const scaledHeight = Math.round(img.height * scale);
+            const w = Math.round(img.width * scale);
+            const h = Math.round(img.height * scale);
 
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width = scaledWidth;
-            canvas.height = scaledHeight;
-            ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+            canvas.width = w;
+            canvas.height = h;
+            ctx.drawImage(img, 0, 0, w, h);
 
-            const srcImg = ctx.getImageData(0, 0, scaledWidth, scaledHeight);
-            const skinColor = detectSkinTone(srcImg.data, scaledWidth, scaledHeight);
+            const srcImg = ctx.getImageData(0, 0, w, h);
             const bgColor = hexToRgb(state.selectedBgColor);
+            const data = srcImg.data;
 
-            // 分块处理像素，每块处理 5000 个像素
-            const chunkSize = 5000;
-            const totalPixels = srcImg.data.length / 4;
+            // 简单背景替换：直接用颜色替换非肤色区域
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
 
-            function processChunk(startPixel) {
-              const endPixel = Math.min(startPixel + chunkSize, totalPixels);
+              // YCbCr 判断皮肤色
+              const y = 0.299 * r + 0.587 * g + 0.114 * b;
+              const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+              const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
-              for (let i = startPixel; i < endPixel; i++) {
-                const idx = i * 4;
-                const r = srcImg.data[idx];
-                const g = srcImg.data[idx + 1];
-                const b = srcImg.data[idx + 2];
+              const isSkin = cb > 77 && cb < 127 && cr > 133 && cr < 173;
 
-                if (!isSkinPixel(r, g, b, skinColor)) {
-                  srcImg.data[idx] = bgColor.r;
-                  srcImg.data[idx + 1] = bgColor.g;
-                  srcImg.data[idx + 2] = bgColor.b;
-                }
-              }
-
-              if (endPixel < totalPixels) {
-                requestAnimationFrame(() => processChunk(endPixel));
-              } else {
-                ctx.putImageData(srcImg, 0, 0);
-                state.processedImage = canvas;
-                state.processScale = scale; // 保存缩放比例
-                resolve();
+              if (!isSkin) {
+                data[i] = bgColor.r;
+                data[i + 1] = bgColor.g;
+                data[i + 2] = bgColor.b;
               }
             }
 
-            processChunk(0);
+            ctx.putImageData(srcImg, 0, 0);
+            state.processedImage = canvas;
+            state.processScale = scale;
+            resolve();
           } catch (err) {
             reject(err);
           }
         };
 
-        img.onerror = () => {
-          reject(new Error('图片加载失败'));
-        };
+        img.onerror = () => reject(new Error('图片加载失败'));
 
         if (state.originalImage instanceof File) {
           img.src = URL.createObjectURL(state.originalImage);
@@ -697,42 +688,36 @@ function startOver() {
       const face = state.detectedFace;
       const scale = state.processScale || 1;
       const srcCanvas = state.processedImage;
-      const srcCtx = srcCanvas.getContext('2d');
       const srcW = srcCanvas.width;
       const srcH = srcCanvas.height;
 
-      // 将人脸坐标转换为缩放后的坐标
-      const scaledFaceX = face.x * scale;
-      const scaledFaceY = face.y * scale;
-      const scaledFaceW = face.width * scale;
-      const scaledFaceH = face.height * scale;
+      // 将人脸坐标转换为处理后图片的坐标
+      const faceCenterX = (face.x + face.width / 2) * srcW;
+      const faceY = face.y * srcH;
+      const faceW = face.width * srcW;
+      const faceH = face.height * srcH;
 
-      const faceCenterX = scaledFaceX + scaledFaceW / 2;
+      // 计算裁剪区域：头部占比约 70%
+      const headRatio = 0.7;
+      const cropH = faceH / headRatio;
+      const cropW = cropH * 0.75; // 证件照宽高比约 3:4
 
-      // 证件照人像框比例：头顶到下巴占整个高度约 70%
-      const headToChinRatio = 0.75;
-      const totalHeight = scaledFaceH / headToChinRatio;
+      // 裁剪框：面部居中偏上
+      let cropX = faceCenterX - cropW / 2;
+      let cropY = faceY - cropH * 0.1; // 头顶稍偏上
 
-      // 人像框尺寸
-      const cropSize = Math.max(totalHeight, scaledFaceW * 1.4);
+      // 边界检查
+      cropX = Math.max(0, Math.min(cropX, srcW - cropW));
+      cropY = Math.max(0, Math.min(cropY, srcH - cropH));
+
+      const finalW = Math.min(cropW, srcW - cropX);
+      const finalH = Math.min(cropH, srcH - cropY);
 
       const cropCanvas = document.createElement('canvas');
       const cropCtx = cropCanvas.getContext('2d');
-
-      // 计算裁剪区域
-      let cropX = faceCenterX * srcW / srcW - cropSize / 2;
-      let cropY = scaledFaceY * srcH / srcH - cropSize * 0.15;
-
-      // 边界检查
-      cropX = Math.max(0, Math.min(cropX, srcW - cropSize));
-      cropY = Math.max(0, Math.min(cropY, srcH - cropSize));
-
-      const cropW = Math.min(cropSize, srcW - cropX);
-      const cropH = Math.min(cropSize, srcH - cropY);
-
-      cropCanvas.width = cropW;
-      cropCanvas.height = cropH;
-      cropCtx.drawImage(srcCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+      cropCanvas.width = finalW;
+      cropCanvas.height = finalH;
+      cropCtx.drawImage(srcCanvas, cropX, cropY, finalW, finalH, 0, 0, finalW, finalH);
 
       state.croppedImage = cropCanvas;
       return cropCanvas;
