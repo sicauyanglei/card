@@ -563,18 +563,28 @@ function startOver() {
         const img = new Image();
         img.onload = () => {
           try {
+            // 计算缩放比例，将图片最大边缩放到 1500px
+            const maxSize = 1500;
+            let scale = 1;
+            if (img.width > maxSize || img.height > maxSize) {
+              scale = maxSize / Math.max(img.width, img.height);
+            }
+
+            const scaledWidth = Math.round(img.width * scale);
+            const scaledHeight = Math.round(img.height * scale);
+
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+            ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
 
-            const srcImg = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const skinColor = detectSkinTone(srcImg.data, canvas.width, canvas.height);
+            const srcImg = ctx.getImageData(0, 0, scaledWidth, scaledHeight);
+            const skinColor = detectSkinTone(srcImg.data, scaledWidth, scaledHeight);
             const bgColor = hexToRgb(state.selectedBgColor);
 
-            // 分块处理像素，每块处理 10000 个像素，避免阻塞 UI
-            const chunkSize = 10000;
+            // 分块处理像素，每块处理 5000 个像素
+            const chunkSize = 5000;
             const totalPixels = srcImg.data.length / 4;
 
             function processChunk(startPixel) {
@@ -594,16 +604,15 @@ function startOver() {
               }
 
               if (endPixel < totalPixels) {
-                // 让浏览器喘口气，继续处理下一块
                 requestAnimationFrame(() => processChunk(endPixel));
               } else {
                 ctx.putImageData(srcImg, 0, 0);
                 state.processedImage = canvas;
+                state.processScale = scale; // 保存缩放比例
                 resolve();
               }
             }
 
-            // 开始分块处理
             processChunk(0);
           } catch (err) {
             reject(err);
@@ -686,37 +695,40 @@ function startOver() {
     // ==================== 自动裁剪 ====================
     async function autoCrop() {
       const face = state.detectedFace;
+      const scale = state.processScale || 1;
       const srcCanvas = state.processedImage;
       const srcCtx = srcCanvas.getContext('2d');
       const srcW = srcCanvas.width;
       const srcH = srcCanvas.height;
 
-      // 计算人像框：头部占比约 70-80%，下部留肩
-      // 头顶到下巴的距离约为 boundingBox 高度的 1.2-1.3 倍
-      const faceCenterX = face.x + face.width / 2;
-      const faceCenterY = face.y + face.height / 2;
+      // 将人脸坐标转换为缩放后的坐标
+      const scaledFaceX = face.x * scale;
+      const scaledFaceY = face.y * scale;
+      const scaledFaceW = face.width * scale;
+      const scaledFaceH = face.height * scale;
+
+      const faceCenterX = scaledFaceX + scaledFaceW / 2;
 
       // 证件照人像框比例：头顶到下巴占整个高度约 70%
       const headToChinRatio = 0.75;
-      const totalHeight = face.height / headToChinRatio;
+      const totalHeight = scaledFaceH / headToChinRatio;
 
-      // 人像框尺寸（正方形裁剪，基于较高维度）
-      const cropSize = Math.max(totalHeight, face.width * 1.4);
+      // 人像框尺寸
+      const cropSize = Math.max(totalHeight, scaledFaceW * 1.4);
 
       const cropCanvas = document.createElement('canvas');
       const cropCtx = cropCanvas.getContext('2d');
 
-      // 计算裁剪区域，使面部居中偏上（下巴在底部 1/3 处）
-      let cropX = faceCenterX * srcW - cropSize * srcW / 2;
-      let cropY = face.y * srcH - cropSize * srcH * 0.15; // 头顶偏上
-      let cropW = cropSize * srcW;
-      let cropH = cropSize * srcH;
+      // 计算裁剪区域
+      let cropX = faceCenterX * srcW / srcW - cropSize / 2;
+      let cropY = scaledFaceY * srcH / srcH - cropSize * 0.15;
 
       // 边界检查
-      cropX = Math.max(0, Math.min(cropX, srcW - cropW));
-      cropY = Math.max(0, Math.min(cropY, srcH - cropH));
-      cropW = Math.min(cropW, srcW - cropX);
-      cropH = Math.min(cropH, srcH - cropY);
+      cropX = Math.max(0, Math.min(cropX, srcW - cropSize));
+      cropY = Math.max(0, Math.min(cropY, srcH - cropSize));
+
+      const cropW = Math.min(cropSize, srcW - cropX);
+      const cropH = Math.min(cropSize, srcH - cropY);
 
       cropCanvas.width = cropW;
       cropCanvas.height = cropH;
