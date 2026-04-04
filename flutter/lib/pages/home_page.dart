@@ -282,7 +282,27 @@ class _HomePageState extends State<HomePage> {
               '请选择证件照背景颜色',
               style: TextStyle(color: Colors.grey, fontSize: 14),
             ),
-            const SizedBox(height: 30),
+
+            // 预览图放上面，更显眼
+            if (_processedImage != null) ...[
+              const SizedBox(height: 20),
+              Container(
+                decoration: BoxDecoration(
+                  color: _selectedBgColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(15),
+                child: Image.memory(
+                  _processedImage!,
+                  height: 180,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
+            // 背景色选项
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: _bgColors.map((color) {
@@ -290,23 +310,26 @@ class _HomePageState extends State<HomePage> {
                 return GestureDetector(
                   onTap: () => setState(() => _selectedBgColor = color),
                   child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 10),
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
                     child: Column(
                       children: [
                         Container(
-                          width: 80,
-                          height: 100,
+                          width: 70,
+                          height: 90,
                           decoration: BoxDecoration(
                             color: color,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isSelected ? Colors.black : Colors.grey[300]!,
-                              width: isSelected ? 3 : 1,
+                              color: isSelected ? Colors.orange : Colors.grey[300]!,
+                              width: isSelected ? 4 : 1,
                             ),
                             boxShadow: color == Colors.white
                                 ? [BoxShadow(color: Colors.grey[300]!)]
                                 : null,
                           ),
+                          child: isSelected
+                              ? const Icon(Icons.check, color: Colors.green, size: 30)
+                              : null,
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -316,6 +339,7 @@ class _HomePageState extends State<HomePage> {
                                   ? '白色'
                                   : '绿色',
                           style: TextStyle(
+                            fontSize: 13,
                             color: isSelected ? const Color(0xFF1E5AA8) : Colors.grey,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                           ),
@@ -326,39 +350,36 @@ class _HomePageState extends State<HomePage> {
                 );
               }).toList(),
             ),
+
             const SizedBox(height: 30),
-            if (_processedImage != null)
-              Container(
-                decoration: BoxDecoration(
-                  color: _selectedBgColor,
-                  borderRadius: BorderRadius.circular(12),
+
+            // 按钮放显眼位置
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _applyBgAndContinue,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E5AA8),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(fontSize: 18),
                 ),
-                padding: const EdgeInsets.all(15),
-                child: Image.memory(
-                  _processedImage!,
-                  height: 200,
-                  fit: BoxFit.contain,
-                ),
+                child: const Text('下一步：美颜设置'),
               ),
-            const SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                OutlinedButton(
-                  onPressed: () => setState(() => _currentStep = 0),
-                  child: const Text('上一步'),
+            ),
+
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => setState(() => _currentStep = 0),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  textStyle: const TextStyle(fontSize: 16),
                 ),
-                const SizedBox(width: 20),
-                ElevatedButton(
-                  onPressed: _applyBgAndContinue,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E5AA8),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                  ),
-                  child: const Text('应用背景色'),
-                ),
-              ],
+                child: const Text('重新选择照片'),
+              ),
             ),
           ],
         ),
@@ -382,7 +403,25 @@ class _HomePageState extends State<HomePage> {
               '调整美颜效果（可选）',
               style: TextStyle(color: Colors.grey, fontSize: 14),
             ),
-            const SizedBox(height: 30),
+
+            // 预览图放上面
+            if (_processedImage != null) ...[
+              const SizedBox(height: 15),
+              Container(
+                decoration: BoxDecoration(
+                  color: _selectedBgColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(15),
+                child: Image.memory(
+                  _processedImage!,
+                  height: 160,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 20),
 
             // 开关
             SwitchListTile(
@@ -394,7 +433,7 @@ class _HomePageState extends State<HomePage> {
             ),
 
             if (_enableBeauty) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               // 磨皮级别
               _buildSlider(
@@ -403,7 +442,7 @@ class _HomePageState extends State<HomePage> {
                 (v) => setState(() => _smoothLevel = v),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // 美白级别
               _buildSlider(
@@ -413,42 +452,35 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 24),
 
-            // 预览
-            if (_processedImage != null)
-              Container(
-                decoration: BoxDecoration(
-                  color: _selectedBgColor,
-                  borderRadius: BorderRadius.circular(12),
+            // 主按钮
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _applyBeautyAndContinue,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E5AA8),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(fontSize: 18),
                 ),
-                padding: const EdgeInsets.all(15),
-                child: Image.memory(
-                  _processedImage!,
-                  height: 200,
-                  fit: BoxFit.contain,
-                ),
+                child: Text(_enableBeauty ? '应用美颜并生成证件照' : '直接生成证件照'),
               ),
+            ),
 
-            const SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                OutlinedButton(
-                  onPressed: () => setState(() => _currentStep = 2),
-                  child: const Text('上一步'),
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => setState(() => _currentStep = 2),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  textStyle: const TextStyle(fontSize: 16),
                 ),
-                const SizedBox(width: 20),
-                ElevatedButton(
-                  onPressed: _applyBeautyAndContinue,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E5AA8),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                  ),
-                  child: const Text('应用并继续'),
-                ),
-              ],
+                child: const Text('上一步（重新选择背景色）'),
+              ),
             ),
           ],
         ),
