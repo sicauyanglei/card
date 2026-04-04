@@ -65,12 +65,28 @@
     <div id="content"></div>
   </div>
 
-  <!-- MediaPipe -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+  <!-- MediaPipe - 使用 unpkg CDN -->
+  <script src="https://unpkg.com/@mediapipe/face_detection@0.4/face_detection.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
 
   <!-- JSZip -->
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <!-- MediaPipe 加载检测 -->
+  <script>
+    window.__mediapipeLoaded = false;
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        if (typeof FaceDetection === 'undefined') {
+          console.error('MediaPipe FaceDetection 未加载，请检查网络连接');
+          window.__mediapipeLoaded = false;
+        } else {
+          console.log('MediaPipe FaceDetection 已加载');
+          window.__mediapipeLoaded = true;
+        }
+      }, 1000);
+    });
+  </script>
 
   <script>
     // JS 将后续步骤填充
@@ -438,16 +454,32 @@ function startOver() {
 
     // ==================== 人脸检测 ====================
     async function detectFace() {
+      console.log('detectFace 开始执行');
+      console.log('FaceDetection 是否定义:', typeof FaceDetection !== 'undefined');
+      console.log('window.__mediapipeLoaded:', window.__mediapipeLoaded);
+
       try {
         if (typeof FaceDetection === 'undefined') {
-          alert('人脸检测库加载失败，请检查网络连接后重试。');
+          console.error('FaceDetection 未定义，人脸检测库加载失败');
+          alert('人脸检测库加载失败，请检查网络连接后刷新页面重试。');
           setStep(1);
           return;
         }
 
-        const faceDetection = new FaceDetection({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/${file}`
-        });
+        console.log('开始创建 FaceDetection 实例...');
+        let detectionCompleted = false;
+        let faceDetection;
+        try {
+          faceDetection = new FaceDetection({
+            locateFile: (file) => `https://unpkg.com/@mediapipe/face_detection@0.4/${file}`
+          });
+          console.log('FaceDetection 实例已创建');
+        } catch (err) {
+          console.error('FaceDetection 构造函数错误:', err);
+          alert('人脸检测初始化失败，请刷新页面重试。');
+          setStep(1);
+          return;
+        }
 
         faceDetection.setOptions({
           model: 'short',
@@ -455,6 +487,8 @@ function startOver() {
         });
 
         faceDetection.onResults((results) => {
+          console.log('FaceDetection onResults 触发');
+          detectionCompleted = true;
           if (results.detections.length === 0) {
             alert('未检测到人脸，请重新拍摄一张面部清晰的照片。');
             setStep(1);
@@ -471,25 +505,53 @@ function startOver() {
             landmarks: detection.landmarks
           };
 
+          console.log('人脸检测成功，准备进入步骤3');
           setStep(3);
         });
 
         // 创建图片元素用于检测
         const img = new Image();
+        console.log('开始加载图片...');
+
+        // 超时保护：20秒（增加超时时间）
+        const timeoutId = setTimeout(() => {
+          if (!detectionCompleted) {
+            console.error('人脸检测超时');
+            faceDetection.onResults = () => {}; // 断开回调
+            alert('人脸检测超时（20秒），可能是网络问题，请重试。');
+            setStep(1);
+          }
+        }, 20000);
+
         img.onload = async () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-          await faceDetection.send({ image: canvas });
+          console.log('图片加载成功，开始发送检测请求');
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            console.log('调用 faceDetection.send()');
+            await faceDetection.send({ image: canvas });
+            console.log('faceDetection.send() 完成');
+          } catch (err) {
+            console.error('faceDetection.send() 错误:', err);
+            clearTimeout(timeoutId);
+            if (!detectionCompleted) {
+              alert('人脸检测失败：' + err.message + '，请重试。');
+              setStep(1);
+            }
+          }
         };
 
         img.onerror = () => {
+          console.error('图片加载失败');
+          clearTimeout(timeoutId);
           alert('图片加载失败，请重新选择照片。');
           setStep(1);
         };
 
+        console.log('设置 img.src...');
         if (state.originalImage instanceof File) {
           img.src = await state.originalImage.arrayBuffer().then(b => {
             const blob = new Blob([b], { type: state.originalImage.type });
@@ -498,6 +560,7 @@ function startOver() {
         } else {
           img.src = state.originalImage;
         }
+        console.log('img.src 已设置，等待加载...');
       } catch (err) {
         alert('人脸检测失败：' + err.message + '，请重试。');
         setStep(1);
