@@ -455,31 +455,55 @@ function startOver() {
     // ==================== 人脸检测 ====================
     async function detectFace() {
       console.log('detectFace 开始执行');
-      console.log('FaceDetection 是否定义:', typeof FaceDetection !== 'undefined');
-      console.log('window.__mediapipeLoaded:', window.__mediapipeLoaded);
 
+      // 先处理图片（抠图），这样备用方案可以直接用
       try {
-        if (typeof FaceDetection === 'undefined') {
-          console.error('FaceDetection 未定义，人脸检测库加载失败');
-          alert('人脸检测库加载失败，请检查网络连接后刷新页面重试。');
-          setStep(1);
-          return;
-        }
+        await processImage();
+      } catch (err) {
+        alert('图片处理失败：' + err.message);
+        setStep(1);
+        return;
+      }
 
-        console.log('开始创建 FaceDetection 实例...');
+      // 尝试使用 MediaPipe
+      if (typeof FaceDetection !== 'undefined') {
+        try {
+          await tryMediaPipeFaceDetection();
+          return; // 成功则直接返回
+        } catch (err) {
+          console.warn('MediaPipe 人脸检测失败，使用备用方案:', err.message);
+        }
+      } else {
+        console.warn('FaceDetection 未定义，使用备用方案');
+      }
+
+      // 备用方案：使用简单皮肤检测定位人脸区域
+      useFallbackFaceDetection();
+    }
+
+    // 尝试 MediaPipe 人脸检测
+    async function tryMediaPipeFaceDetection() {
+      return new Promise((resolve, reject) => {
         let detectionCompleted = false;
         let faceDetection;
+
         try {
           faceDetection = new FaceDetection({
             locateFile: (file) => `https://cdn.bootcdn.net/ajax/libs/mediapipe/0.4.162/face_detection/${file}`
           });
-          console.log('FaceDetection 实例已创建');
         } catch (err) {
-          console.error('FaceDetection 构造函数错误:', err);
-          alert('人脸检测初始化失败，请刷新页面重试。');
-          setStep(1);
+          reject(new Error('FaceDetection 初始化失败'));
           return;
         }
+
+        // 超时保护：15秒
+        const timeoutId = setTimeout(() => {
+          if (!detectionCompleted) {
+            detectionCompleted = true;
+            faceDetection.onResults = () => {};
+            reject(new Error('检测超时'));
+          }
+        }, 15000);
 
         faceDetection.setOptions({
           model: 'short',
@@ -487,84 +511,127 @@ function startOver() {
         });
 
         faceDetection.onResults((results) => {
-          console.log('FaceDetection onResults 触发');
           detectionCompleted = true;
-          if (results.detections.length === 0) {
-            alert('未检测到人脸，请重新拍摄一张面部清晰的照片。');
-            setStep(1);
-            return;
+          clearTimeout(timeoutId);
+
+          if (results.detections && results.detections.length > 0) {
+            const detection = results.detections[0];
+            const bbox = detection.boundingBox;
+            state.detectedFace = {
+              x: bbox.x,
+              y: bbox.y,
+              width: bbox.width,
+              height: bbox.height,
+              landmarks: detection.landmarks
+            };
+            console.log('MediaPipe 人脸检测成功');
+            setStep(3);
+            resolve();
+          } else {
+            reject(new Error('未检测到人脸'));
           }
-
-          const detection = results.detections[0];
-          const bbox = detection.boundingBox;
-          state.detectedFace = {
-            x: bbox.x,
-            y: bbox.y,
-            width: bbox.width,
-            height: bbox.height,
-            landmarks: detection.landmarks
-          };
-
-          console.log('人脸检测成功，准备进入步骤3');
-          setStep(3);
         });
 
-        // 创建图片元素用于检测
+        // 加载图片并发送检测
         const img = new Image();
-        console.log('开始加载图片...');
-
-        // 超时保护：20秒（增加超时时间）
-        const timeoutId = setTimeout(() => {
-          if (!detectionCompleted) {
-            console.error('人脸检测超时');
-            faceDetection.onResults = () => {}; // 断开回调
-            alert('人脸检测超时（20秒），可能是网络问题，请重试。');
-            setStep(1);
-          }
-        }, 20000);
-
         img.onload = async () => {
-          console.log('图片加载成功，开始发送检测请求');
           try {
             const canvas = document.createElement('canvas');
             canvas.width = img.width;
             canvas.height = img.height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0);
-            console.log('调用 faceDetection.send()');
             await faceDetection.send({ image: canvas });
-            console.log('faceDetection.send() 完成');
           } catch (err) {
-            console.error('faceDetection.send() 错误:', err);
             clearTimeout(timeoutId);
             if (!detectionCompleted) {
-              alert('人脸检测失败：' + err.message + '，请重试。');
-              setStep(1);
+              reject(err);
             }
           }
         };
-
         img.onerror = () => {
-          console.error('图片加载失败');
           clearTimeout(timeoutId);
-          alert('图片加载失败，请重新选择照片。');
-          setStep(1);
+          if (!detectionCompleted) {
+            reject(new Error('图片加载失败'));
+          }
         };
 
-        console.log('设置 img.src...');
         if (state.originalImage instanceof File) {
-          img.src = await state.originalImage.arrayBuffer().then(b => {
-            const blob = new Blob([b], { type: state.originalImage.type });
-            return URL.createObjectURL(blob);
-          });
+          img.src = URL.createObjectURL(state.originalImage);
         } else {
           img.src = state.originalImage;
         }
-        console.log('img.src 已设置，等待加载...');
-      } catch (err) {
-        alert('人脸检测失败：' + err.message + '，请重试。');
-        setStep(1);
+      });
+    }
+
+    // 备用方案：基于皮肤颜色检测人脸区域
+    function useFallbackFaceDetection() {
+      const canvas = state.processedImage;
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imgData.data;
+
+      // 扫描找到皮肤色块中心（人脸大致区域）
+      let skinPixels = [];
+      const step = 4; // 每4个像素检测一次，加快速度
+
+      for (let y = 0; y < canvas.height; y += step) {
+        for (let x = 0; x < canvas.width; x += step) {
+          const idx = (y * canvas.width + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+
+          // YCbCr 皮肤色判断
+          const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+          const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+          const isSkin = cb > 77 && cb < 127 && cr > 133 && cr < 173;
+
+          if (isSkin) {
+            skinPixels.push({ x, y });
+          }
+        }
       }
+
+      if (skinPixels.length === 0) {
+        // 没找到皮肤色，使用中心区域
+        console.warn('未检测到皮肤色，使用中心裁剪');
+        state.detectedFace = {
+          x: 0.3,
+          y: 0.2,
+          width: 0.4,
+          height: 0.4
+        };
+      } else {
+        // 找到皮肤色块，计算边界
+        let minX = canvas.width, maxX = 0, minY = canvas.height, maxY = 0;
+
+        // 只考虑上半部分的皮肤像素（头部通常在上半部分）
+        const midY = canvas.height * 0.6;
+        skinPixels = skinPixels.filter(p => p.y < midY);
+
+        for (const p of skinPixels) {
+          minX = Math.min(minX, p.x);
+          maxX = Math.max(maxX, p.x);
+          minY = Math.min(minY, p.y);
+          maxY = Math.max(maxY, p.y);
+        }
+
+        // 添加适当边距
+        const padX = (maxX - minX) * 0.3;
+        const padY = (maxY - minY) * 0.2;
+
+        state.detectedFace = {
+          x: Math.max(0, (minX - padX) / canvas.width),
+          y: Math.max(0, (minY - padY) / canvas.height),
+          width: Math.min(1, (maxX - minX + 2 * padX) / canvas.width),
+          height: Math.min(1, (maxY - minY + 2 * padY) / canvas.height)
+        };
+      }
+
+      console.log('使用备用方案检测人脸:', state.detectedFace);
+      alert('正在使用快速检测模式，请选择背景色继续');
+      setStep(3);
     }
 
     // ==================== 生成各尺寸证件照 ====================
