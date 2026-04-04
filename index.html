@@ -65,9 +65,9 @@
     <div id="content"></div>
   </div>
 
-  <!-- MediaPipe - 使用 unpkg CDN -->
-  <script src="https://unpkg.com/@mediapipe/face_detection@0.4/face_detection.js" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+  <!-- MediaPipe - 使用 bootcdn -->
+  <script src="https://cdn.bootcdn.net/ajax/libs/mediapipe/0.4.162/face_detection/face_detection.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/mediapipe/0.4.162/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 
   <!-- JSZip -->
   <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -471,7 +471,7 @@ function startOver() {
         let faceDetection;
         try {
           faceDetection = new FaceDetection({
-            locateFile: (file) => `https://unpkg.com/@mediapipe/face_detection@0.4/${file}`
+            locateFile: (file) => `https://cdn.bootcdn.net/ajax/libs/mediapipe/0.4.162/face_detection/${file}`
           });
           console.log('FaceDetection 实例已创建');
         } catch (err) {
