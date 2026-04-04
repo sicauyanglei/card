@@ -1,0 +1,53 @@
+{
+  "name": "证件照制作",
+  "appid": "",
+  "description": "一款方便的证件照生成工具",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "minified": true
+    },
+    "usingComponents": true
+  },
+  "app-plus": {
+    "usingComponents": true,
+    "nvueStyleCompiler": "uni-app",
+    "compilerVersion": 3,
+    "splashscreen": {
+      "alwaysShowBeforeRender": true,
+      "waiting": true,
+      "autoclose": true,
+      "delay": 0
+    },
+    "modules": {},
+    "distribute": {
+      "android": {
+        "permissions": [
+          "<uses-permission android:name=\"android.permission.CAMERA\"/>",
+          "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>",
+          "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>"
+        ]
+      },
+      "ios": {}
+    }
+  },
+  "quickapp": {},
+  "h5": {
+    "template": "",
+    "router": {
+      "mode": "hash",
+      "base": "./"
+    },
+    "optimization": {
+      "treeShaking": {
+        "enable": true
+      }
+    },
+    "title": "证件照制作工具"
+  }
+}

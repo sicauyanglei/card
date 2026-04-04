@@ -1,0 +1,26 @@
+{
+  "name": "id-photo-maker",
+  "version": "1.0.0",
+  "description": "证件照制作工具",
+  "main": "main.js",
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development UNI_PLATFORM=mp-weixin vue-cli-service uni-build --watch",
+    "build": "cross-env NODE_ENV=production UNI_PLATFORM=mp-weixin vue-cli-service uni-build",
+    "dev:app": "cross-env NODE_ENV=development UNI_PLATFORM=app vue-cli-service uni-build --watch",
+    "build:app": "cross-env NODE_ENV=production UNI_PLATFORM=app vue-cli-service uni-build"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "^3.0.0-alpha-3090920230703001",
+    "@dcloudio/uni-h5": "^3.0.0-alpha-3090920230703001",
+    "@dcloudio/uni-mp-weixin": "^3.0.0-alpha-3090920230703001",
+    "jszip": "^3.10.1",
+    "vue": "^3.2.47"
+  },
+  "devDependencies": {
+    "@dcloudio/vue-cli-plugin-uni": "^3.0.0-alpha-3090920230703001",
+    "@dcloudio/webpack-uni-mp-loader": "^3.0.0-alpha-3090920230703001",
+    "@vue/cli-service": "^5.0.8",
+    "cross-env": "^7.0.3",
+    "sass": "^1.62.1"
+  }
+}
